@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orders & Payments Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- SheetJS (xlsx) for Excel parsing and exporting -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.full.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://cdn.jsdelivr.net/npm/lucide-element"></script>
+
+    <style>
+        /* Simple fade-in animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-orange-50 to-orange-100">
+
+    <div id="app" class="min-h-screen p-4"></div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const app = document.getElementById('app');
+
+            // --- STATE MANAGEMENT ---
+            let state = {
+                ordersData: null,
+                paymentsData: null,
+                commissionRate: 0.05,
+                results: null,
+                loading: false,
+                errors: [],
+            };
+
+            // --- UTILITY FUNCTIONS ---
+            const setState = (newState) => {
+                state = { ...state, ...newState };
+                render();
+            };
+            
+            // --- CORE LOGIC FUNCTIONS ---
+            const parseFile = (file) => {
+                return new Promise((resolve, reject) => {
+                    const fileExtension = file.name.split('.').pop().toLowerCase();
+
+                    if (fileExtension === 'csv') {
+                        Papa.parse(file, {
+                            header: true,
+                            dynamicTyping: true,
+                            skipEmptyLines: true,
+                            complete: (results) => {
+                                if (results.errors.length > 0) {
+                                    reject(new Error('CSV parsing errors: ' + results.errors.map(e => e.message).join(', ')));
+                                } else {
+                                    resolve(results.data);
+                                }
+                            },
+                            error: (error) => reject(error)
+                        });
+                    } else if (['xlsx', 'xls'].includes(fileExtension)) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            try {
+                                const workbook = XLSX.read(e.target.result, { type: 'binary' });
+                                const sheetName = workbook.SheetNames[0];
+                                const worksheet = workbook.Sheets[sheetName];
+                                const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+                                if (data.length > 0) {
+                                    const headers = data[0];
+                                    const rows = data.slice(1).map(row => {
+                                        const obj = {};
+                                        headers.forEach((header, index) => {
+                                            obj[header] = row[index];
+                                        });
+                                        return obj;
+                                    });
+                                    resolve(rows);
+                                } else {
+                                    reject(new Error('No data found in Excel file'));
+                                }
+                            } catch (error) {
+                                reject(error);
+                            }
+                        };
+                        reader.onerror = () => reject(new Error('Failed to read file'));
+                        reader.readAsBinaryString(file);
+                    } else {
+                        reject(new Error('Unsupported file format. Please use CSV or Excel files.'));
+                    }
+                });
+            };
+
+            const handleFileUpload = async (file, type) => {
+                try {
+                    setState({ errors: [] });
+                    const data = await parseFile(file);
+                    if (type === 'orders') {
+                        setState({ ordersData: data });
+                    } else {
+                        setState({ paymentsData: data });
+                    }
+                } catch (error) {
+                    setState({ errors: [...state.errors, `Error parsing ${type} file: ${error.message}`] });
+                }
+            };
+
+            const calculateResults = () => {
+                if (!state.ordersData || !state.paymentsData) {
+                    setState({ errors: ['Please upload both orders and payments files'] });
+                    return;
+                }
+
+                setState({ loading: true, errors: [], results: null });
+
+                // Use setTimeout to allow the UI to update to the "loading" state
+                setTimeout(() => {
+                    try {
+                        const paymentFees = {};
+                        state.paymentsData.forEach(row => {
+                            const paymentRef = row['payment_ref_id (metadata)']?.toString()?.trim();
+                            const fee = parseFloat(row['Fee']?.toString()?.replace(',', '.'));
+                            if (paymentRef && !isNaN(fee)) {
+                                paymentFees[paymentRef] = fee;
+                            }
+                        });
+
+                        let totalProcessingFee = 0;
+                        let totalCashPayments = 0;
+                        let cashOrderCount = 0;
+                        
+                        const processedOrders = state.ordersData.map(order => {
+                            const orderID = order['Order ID']?.toString()?.trim();
+                            const fee = paymentFees[orderID] || 0;
+                            totalProcessingFee += fee;
+
+                            if (fee === 0) {
+                                const headers = Object.keys(order);
+                                let grandTotalColumn = 'Grand Total';
+                                if (!headers.includes('Grand Total') && headers.length >= 9) {
+                                    grandTotalColumn = headers[8];
+                                }
+                                let orderAmount = order[grandTotalColumn];
+                                if (typeof orderAmount === 'string') {
+                                    orderAmount = orderAmount.replace(/[€$£,\s]/g, '').replace(',', '.');
+                                }
+                                const amount = parseFloat(orderAmount);
+                                if (!isNaN(amount) && amount > 0) {
+                                    totalCashPayments += amount;
+                                    cashOrderCount++;
+                                }
+                            }
+                            return { ...order, processingFee: fee, paymentType: fee === 0 ? 'Cash' : 'Card' };
+                        });
+                        
+                        const headers = Object.keys(state.ordersData[0] || {});
+                        let grandTotalColumn = 'Grand Total';
+                        if (!headers.includes('Grand Total')) {
+                            if (headers.length >= 9) {
+                                grandTotalColumn = headers[8];
+                            } else {
+                                const possibleColumns = ['I', 'Total', 'Amount'];
+                                for (const col of possibleColumns) {
+                                    if (headers.includes(col)) { grandTotalColumn = col; break; }
+                                }
+                            }
+                        }
+
+                        let grandTotalSum = 0;
+                        if(grandTotalColumn && headers.includes(grandTotalColumn)) {
+                             grandTotalSum = state.ordersData.reduce((sum, row) => {
+                                let val = row[grandTotalColumn];
+                                if (typeof val === 'string') {
+                                    val = val.replace(/[€$£,\s]/g, '').replace(',', '.');
+                                }
+                                const num = parseFloat(val);
+                                return sum + (isNaN(num) ? 0 : num);
+                            }, 0);
+                        }
+
+
+                        const commission = grandTotalSum * state.commissionRate;
+
+                        setState({
+                            results: {
+                                processedOrders,
+                                totalProcessingFee,
+                                totalCashPayments,
+                                cashOrderCount,
+                                grandTotalSum,
+                                commission,
+                                summary: [
+                                    { label: `Grand Total SUM (${state.ordersData.length} rows)`, value: grandTotalSum },
+                                    { label: `Commission (${(state.commissionRate * 100).toFixed(2)}%)`, value: commission },
+                                    { label: 'Total Processing Fee', value: totalProcessingFee },
+                                    { label: `Cash Payments (${cashOrderCount} orders)`, value: totalCashPayments }
+                                ]
+                            }
+                        });
+
+                    } catch (error) {
+                        setState({ errors: ['Calculation error: ' + error.message] });
+                    } finally {
+                        setState({ loading: false });
+                    }
+                }, 100); // Small delay for UI update
+            };
+            
+            const exportResults = () => {
+                if (!state.results) return;
+                try {
+                    const wb = XLSX.utils.book_new();
+                    const ordersWS = XLSX.utils.json_to_sheet(state.results.processedOrders);
+                    XLSX.utils.book_append_sheet(wb, ordersWS, 'Processed Orders');
+                    const summaryWS = XLSX.utils.json_to_sheet(state.results.summary);
+                    XLSX.utils.book_append_sheet(wb, summaryWS, 'Summary');
+                    XLSX.writeFile(wb, 'orders_payments_results.xlsx');
+                } catch (error) {
+                    setState({ errors: [...state.errors, 'Export error: ' + error.message] });
+                }
+            };
+
+            // --- RENDER FUNCTIONS ---
+            const renderFileUploadCard = (title, type, iconName, data) => `
+                <div class="bg-white rounded-xl shadow-lg p-6 border-2 border-dashed border-gray-200 hover:border-orange-300 transition-colors">
+                    <div class="text-center">
+                        <lucide-icon name="${iconName}" class="mx-auto h-12 w-12 mb-4 ${data ? 'text-green-500' : 'text-gray-400'}"></lucide-icon>
+                        <h3 class="text-lg font-semibold mb-2">${title}</h3>
+                        ${data ? `
+                            <div class="flex items-center justify-center text-green-600 mb-4">
+                                <lucide-icon name="check-circle" class="h-5 w-5 mr-2"></lucide-icon>
+                                <span>${data.length} rows loaded</span>
+                            </div>
+                        ` : `
+                            <p class="text-gray-500 mb-4">Upload CSV or Excel file</p>
+                        `}
+                        <input type="file" accept=".csv,.xlsx,.xls" class="hidden" id="${type}-upload">
+                        <label for="${type}-upload" class="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 cursor-pointer transition-colors">
+                            <lucide-icon name="upload" class="h-4 w-4 mr-2"></lucide-icon>
+                            ${data ? 'Replace File' : 'Choose File'}
+                        </label>
+                    </div>
+                </div>`;
+
+            const renderResults = () => {
+                if (!state.results) return '';
+                return `
+                <div class="space-y-6 fade-in">
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                            <h3 class="text-2xl font-bold text-gray-800">Summary Results</h3>
+                            <button id="export-btn" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                                <lucide-icon name="download" class="h-4 w-4 mr-2"></lucide-icon>
+                                Export Results
+                            </button>
+                        </div>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            ${state.results.summary.map(item => `
+                                <div class="bg-orange-50 rounded-lg p-4 border border-orange-200">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-semibold text-gray-700">${item.label}:</span>
+                                        <span class="text-xl font-bold text-orange-600">
+                                            €${item.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl shadow-lg p-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">Processed Orders Preview (${state.results.processedOrders.length} total)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Order ID</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Type</th>
+                                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processing Fee</th>
+                                        ${Object.keys(state.results.processedOrders[0] || {}).slice(0, 3).map(key => `
+                                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">${key}</th>
+                                        `).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    ${state.results.processedOrders.slice(0, 10).map(order => `
+                                        <tr class="hover:bg-gray-50">
+                                            <td class="px-4 py-3 text-sm text-gray-900">${order['Order ID'] || ''}</td>
+                                            <td class="px-4 py-3 text-sm">
+                                                <span class="px-2 py-1 rounded-full text-xs font-medium ${order.paymentType === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                                                    ${order.paymentType}
+                                                </span>
+                                            </td>
+                                            <td class="px-4 py-3 text-sm font-medium text-orange-600">€${order.processingFee.toFixed(2)}</td>
+                                            ${Object.values(order).slice(0, 3).map(value => {
+                                                const displayValue = value?.toString() || '';
+                                                return `<td class="px-4 py-3 text-sm text-gray-900">${displayValue.length > 50 ? displayValue.substring(0, 50) + '...' : displayValue}</td>`
+                                            }).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                            ${state.results.processedOrders.length > 10 ? `<p class="text-center text-gray-500 mt-4">... and ${state.results.processedOrders.length - 10} more rows</p>` : ''}
+                        </div>
+                    </div>
+                </div>
+                `;
+            };
+
+            const render = () => {
+                const isButtonDisabled = !state.ordersData || !state.paymentsData || state.loading;
+
+                app.innerHTML = `
+                <div class="max-w-6xl mx-auto">
+                    <div class="text-center mb-8">
+                        <h1 class="text-4xl font-bold text-gray-800 mb-2">Orders & Payments Calculator</h1>
+                        <p class="text-gray-600">Upload your orders and payments data to calculate processing fees and summaries</p>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6 mb-8">
+                        ${renderFileUploadCard('Orders Data', 'orders', 'file-text', state.ordersData)}
+                        ${renderFileUploadCard('Payments Data', 'payments', 'file-text', state.paymentsData)}
+                    </div>
+
+                    <div class="bg-white rounded-xl shadow-lg p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">Configuration</h3>
+                        <div class="flex items-center space-x-4">
+                            <label class="text-gray-700 font-medium">Commission Rate:</label>
+                            <input type="number" step="0.01" min="0" max="1" value="${state.commissionRate}" id="commission-rate" class="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 w-24">
+                            <span class="text-gray-600">(${(state.commissionRate * 100).toFixed(2)}%)</span>
+                        </div>
+                    </div>
+
+                    ${state.errors.length > 0 ? `
+                        <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 fade-in">
+                            <div class="flex items-center mb-2">
+                                <lucide-icon name="alert-circle" class="h-5 w-5 text-red-500 mr-2"></lucide-icon>
+                                <h3 class="font-semibold text-red-800">Errors</h3>
+                            </div>
+                            ${state.errors.map(error => `<p class="text-red-700 ml-7">${error}</p>`).join('')}
+                        </div>
+                    ` : ''}
+
+                    <div class="text-center mb-8">
+                        <button id="calculate-btn" ${isButtonDisabled ? 'disabled' : ''} class="inline-flex items-center px-8 py-3 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-lg">
+                            <lucide-icon name="${state.loading ? 'loader-2' : 'calculator'}" class="h-5 w-5 mr-2 ${state.loading ? 'animate-spin' : ''}"></lucide-icon>
+                            ${state.loading ? 'Calculating...' : 'Calculate Results'}
+                        </button>
+                    </div>
+                    
+                    <div id="results-container">
+                        ${renderResults()}
+                    </div>
+                </div>
+                `;
+
+                // --- ADD EVENT LISTENERS ---
+                document.getElementById('orders-upload').addEventListener('change', (e) => e.target.files[0] && handleFileUpload(e.target.files[0], 'orders'));
+                document.getElementById('payments-upload').addEventListener('change', (e) => e.target.files[0] && handleFileUpload(e.target.files[0], 'payments'));
+                document.getElementById('commission-rate').addEventListener('input', (e) => {
+                    // Re-render only the span, not the whole app for performance
+                    const rate = parseFloat(e.target.value) || 0;
+                    state.commissionRate = rate; // update state directly for this minor change
+                    e.target.nextElementSibling.textContent = `(${(rate * 100).toFixed(2)}%)`;
+                });
+                 document.getElementById('commission-rate').addEventListener('change', (e) => {
+                    // Update state fully on blur/change
+                     setState({ commissionRate: parseFloat(e.target.value) || 0 });
+                });
+                document.getElementById('calculate-btn').addEventListener('click', calculateResults);
+                
+                if (document.getElementById('export-btn')) {
+                    document.getElementById('export-btn').addEventListener('click', exportResults);
+                }
+            };
+
+            // Initial Render
+            render();
+        });
+    </script>
+</body>
+</html>
