@@ -77,10 +77,13 @@
                         const reader = new FileReader();
                         reader.onload = (e) => {
                             try {
-                                const workbook = XLSX.read(e.target.result, { type: 'binary' });
+                                if (!window.XLSX) {
+                                    throw new Error("Excel parsing library (SheetJS) is not loaded.");
+                                }
+                                const workbook = window.XLSX.read(e.target.result, { type: 'binary' });
                                 const sheetName = workbook.SheetNames[0];
                                 const worksheet = workbook.Sheets[sheetName];
-                                const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                                const data = window.XLSX.utils.sheet_to_json(worksheet, { header: 1 });
 
                                 if (data.length > 0) {
                                     const headers = data[0];
@@ -225,12 +228,16 @@
             const exportResults = () => {
                 if (!state.results) return;
                 try {
-                    const wb = XLSX.utils.book_new();
-                    const ordersWS = XLSX.utils.json_to_sheet(state.results.processedOrders);
-                    XLSX.utils.book_append_sheet(wb, ordersWS, 'Processed Orders');
-                    const summaryWS = XLSX.utils.json_to_sheet(state.results.summary);
-                    XLSX.utils.book_append_sheet(wb, summaryWS, 'Summary');
-                    XLSX.writeFile(wb, 'orders_payments_results.xlsx');
+                    if (!window.XLSX) {
+                        setState({ errors: [...state.errors, 'Export library (SheetJS) is not ready. Please try again in a moment.'] });
+                        return;
+                    }
+                    const wb = window.XLSX.utils.book_new();
+                    const ordersWS = window.XLSX.utils.json_to_sheet(state.results.processedOrders);
+                    window.XLSX.utils.book_append_sheet(wb, ordersWS, 'Processed Orders');
+                    const summaryWS = window.XLSX.utils.json_to_sheet(state.results.summary);
+                    window.XLSX.utils.book_append_sheet(wb, summaryWS, 'Summary');
+                    window.XLSX.writeFile(wb, 'orders_payments_results.xlsx');
                 } catch (error) {
                     setState({ errors: [...state.errors, 'Export error: ' + error.message] });
                 }
@@ -395,3 +402,4 @@
     </script>
 </body>
 </html>
+
