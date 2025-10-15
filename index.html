@@ -8,8 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- PapaParse for CSV parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- SheetJS (xlsx) for Excel parsing and exporting -->
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.full.min.js"></script>
     <!-- Lucide Icons -->
     <script src="https://cdn.jsdelivr.net/npm/lucide-element"></script>
 
@@ -73,39 +71,8 @@
                             },
                             error: (error) => reject(error)
                         });
-                    } else if (['xlsx', 'xls'].includes(fileExtension)) {
-                        const reader = new FileReader();
-                        reader.onload = (e) => {
-                            try {
-                                if (!window.XLSX) {
-                                    throw new Error("Excel parsing library (SheetJS) is not loaded.");
-                                }
-                                const workbook = window.XLSX.read(e.target.result, { type: 'binary' });
-                                const sheetName = workbook.SheetNames[0];
-                                const worksheet = workbook.Sheets[sheetName];
-                                const data = window.XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-
-                                if (data.length > 0) {
-                                    const headers = data[0];
-                                    const rows = data.slice(1).map(row => {
-                                        const obj = {};
-                                        headers.forEach((header, index) => {
-                                            obj[header] = row[index];
-                                        });
-                                        return obj;
-                                    });
-                                    resolve(rows);
-                                } else {
-                                    reject(new Error('No data found in Excel file'));
-                                }
-                            } catch (error) {
-                                reject(error);
-                            }
-                        };
-                        reader.onerror = () => reject(new Error('Failed to read file'));
-                        reader.readAsBinaryString(file);
                     } else {
-                        reject(new Error('Unsupported file format. Please use CSV or Excel files.'));
+                        reject(new Error('Only CSV files are supported in this version. Please convert Excel files to CSV format.'));
                     }
                 });
             };
@@ -132,7 +99,6 @@
 
                 setState({ loading: true, errors: [], results: null });
 
-                // Use setTimeout to allow the UI to update to the "loading" state
                 setTimeout(() => {
                     try {
                         const paymentFees = {};
@@ -222,23 +188,38 @@
                     } finally {
                         setState({ loading: false });
                     }
-                }, 100); // Small delay for UI update
+                }, 100);
             };
             
             const exportResults = () => {
                 if (!state.results) return;
                 try {
-                    if (!window.XLSX) {
-                        setState({ errors: [...state.errors, 'Export library (SheetJS) is not ready. Please try again in a moment.'] });
-                        return;
-                    }
-                    const wb = window.XLSX.utils.book_new();
-                    const ordersWS = window.XLSX.utils.json_to_sheet(state.results.processedOrders);
-                    window.XLSX.utils.book_append_sheet(wb, ordersWS, 'Processed Orders');
-                    const summaryWS = window.XLSX.utils.json_to_sheet(state.results.summary);
-                    window.XLSX.utils.book_append_sheet(wb, summaryWS, 'Summary');
-                    window.XLSX.writeFile(wb, 'orders_payments_results.xlsx');
+                    // Export summary to CSV
+                    const summaryCSV = Papa.unparse(state.results.summary);
+                    const summaryBlob = new Blob([summaryCSV], { type: 'text/csv;charset=utf-8;' });
+                    const summaryURL = URL.createObjectURL(summaryBlob);
+                    const summaryLink = document.createElement('a');
+                    summaryLink.href = summaryURL;
+                    summaryLink.setAttribute('download', 'orders_payments_summary.csv');
+                    summaryLink.style.visibility = 'hidden';
+                    document.body.appendChild(summaryLink);
+                    summaryLink.click();
+                    document.body.removeChild(summaryLink);
+
+                    // Export processed orders to CSV
+                    const ordersCSV = Papa.unparse(state.results.processedOrders);
+                    const ordersBlob = new Blob([ordersCSV], { type: 'text/csv;charset=utf-8;' });
+                    const ordersURL = URL.createObjectURL(ordersBlob);
+                    const ordersLink = document.createElement('a');
+                    ordersLink.href = ordersURL;
+                    ordersLink.setAttribute('download', 'orders_payments_processed.csv');
+                    ordersLink.style.visibility = 'hidden';
+                    document.body.appendChild(ordersLink);
+                    ordersLink.click();
+                    document.body.removeChild(ordersLink);
+
                 } catch (error) {
+                    console.error('Export error:', error);
                     setState({ errors: [...state.errors, 'Export error: ' + error.message] });
                 }
             };
@@ -255,9 +236,9 @@
                                 <span>${data.length} rows loaded</span>
                             </div>
                         ` : `
-                            <p class="text-gray-500 mb-4">Upload CSV or Excel file</p>
+                            <p class="text-gray-500 mb-4">Upload CSV file</p>
                         `}
-                        <input type="file" accept=".csv,.xlsx,.xls" class="hidden" id="${type}-upload">
+                        <input type="file" accept=".csv" class="hidden" id="${type}-upload">
                         <label for="${type}-upload" class="inline-flex items-center px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 cursor-pointer transition-colors">
                             <lucide-icon name="upload" class="h-4 w-4 mr-2"></lucide-icon>
                             ${data ? 'Replace File' : 'Choose File'}
@@ -274,7 +255,7 @@
                             <h3 class="text-2xl font-bold text-gray-800">Summary Results</h3>
                             <button id="export-btn" class="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
                                 <lucide-icon name="download" class="h-4 w-4 mr-2"></lucide-icon>
-                                Export Results
+                                Export as CSV
                             </button>
                         </div>
                         <div class="grid md:grid-cols-2 gap-6">
@@ -337,6 +318,9 @@
                     <div class="text-center mb-8">
                         <h1 class="text-4xl font-bold text-gray-800 mb-2">Orders & Payments Calculator</h1>
                         <p class="text-gray-600">Upload your orders and payments data to calculate processing fees and summaries</p>
+                        <div class="mt-2 text-sm text-orange-600 bg-orange-50 inline-block px-4 py-2 rounded-lg border border-orange-200">
+                           CSV files only - Excel support is not available in this version
+                        </div>
                     </div>
 
                     <div class="grid md:grid-cols-2 gap-6 mb-8">
@@ -380,13 +364,11 @@
                 document.getElementById('orders-upload').addEventListener('change', (e) => e.target.files[0] && handleFileUpload(e.target.files[0], 'orders'));
                 document.getElementById('payments-upload').addEventListener('change', (e) => e.target.files[0] && handleFileUpload(e.target.files[0], 'payments'));
                 document.getElementById('commission-rate').addEventListener('input', (e) => {
-                    // Re-render only the span, not the whole app for performance
                     const rate = parseFloat(e.target.value) || 0;
-                    state.commissionRate = rate; // update state directly for this minor change
+                    state.commissionRate = rate;
                     e.target.nextElementSibling.textContent = `(${(rate * 100).toFixed(2)}%)`;
                 });
                  document.getElementById('commission-rate').addEventListener('change', (e) => {
-                    // Update state fully on blur/change
                      setState({ commissionRate: parseFloat(e.target.value) || 0 });
                 });
                 document.getElementById('calculate-btn').addEventListener('click', calculateResults);
