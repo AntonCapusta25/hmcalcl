@@ -165,6 +165,11 @@
 
 
                         const commission = grandTotalSum * state.commissionRate;
+                        
+                        // Filter for specific transaction types for export
+                        const cashTransactions = processedOrders.filter(order => order.paymentType === 'Cash');
+                        const chefTransactions = processedOrders.filter(order => order['Sales channel name']?.toString().toLowerCase().trim() === 'chef');
+
 
                         setState({
                             results: {
@@ -174,6 +179,8 @@
                                 cashOrderCount,
                                 grandTotalSum,
                                 commission,
+                                cashTransactions,
+                                chefTransactions,
                                 summary: [
                                     { label: `Grand Total SUM (${state.ordersData.length} rows)`, value: grandTotalSum },
                                     { label: `Commission (${(state.commissionRate * 100).toFixed(2)}%)`, value: commission },
@@ -217,6 +224,35 @@
                     document.body.appendChild(ordersLink);
                     ordersLink.click();
                     document.body.removeChild(ordersLink);
+
+                    // Export cash transactions if any
+                    if (state.results.cashTransactions && state.results.cashTransactions.length > 0) {
+                        const cashCSV = Papa.unparse(state.results.cashTransactions);
+                        const cashBlob = new Blob([cashCSV], { type: 'text/csv;charset=utf-8;' });
+                        const cashURL = URL.createObjectURL(cashBlob);
+                        const cashLink = document.createElement('a');
+                        cashLink.href = cashURL;
+                        cashLink.setAttribute('download', 'cash_transactions.csv');
+                        cashLink.style.visibility = 'hidden';
+                        document.body.appendChild(cashLink);
+                        cashLink.click();
+                        document.body.removeChild(cashLink);
+                    }
+
+                    // Export chef transactions if any
+                    if (state.results.chefTransactions && state.results.chefTransactions.length > 0) {
+                        const chefCSV = Papa.unparse(state.results.chefTransactions);
+                        const chefBlob = new Blob([chefCSV], { type: 'text/csv;charset=utf-8;' });
+                        const chefURL = URL.createObjectURL(chefBlob);
+                        const chefLink = document.createElement('a');
+                        chefLink.href = chefURL;
+                        chefLink.setAttribute('download', 'chef_transactions.csv');
+                        chefLink.style.visibility = 'hidden';
+                        document.body.appendChild(chefLink);
+                        chefLink.click();
+                        document.body.removeChild(chefLink);
+                    }
+
 
                 } catch (error) {
                     console.error('Export error:', error);
@@ -384,4 +420,5 @@
     </script>
 </body>
 </html>
+
 
