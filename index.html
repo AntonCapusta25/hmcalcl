@@ -201,29 +201,21 @@
             const exportResults = () => {
                 if (!state.results) return;
                 try {
-                    // Export summary to CSV
+                    // Combine Summary and Processed Orders into one CSV string
                     const summaryCSV = Papa.unparse(state.results.summary);
-                    const summaryBlob = new Blob([summaryCSV], { type: 'text/csv;charset=utf-8;' });
-                    const summaryURL = URL.createObjectURL(summaryBlob);
-                    const summaryLink = document.createElement('a');
-                    summaryLink.href = summaryURL;
-                    summaryLink.setAttribute('download', 'orders_payments_summary.csv');
-                    summaryLink.style.visibility = 'hidden';
-                    document.body.appendChild(summaryLink);
-                    summaryLink.click();
-                    document.body.removeChild(summaryLink);
-
-                    // Export processed orders to CSV
                     const ordersCSV = Papa.unparse(state.results.processedOrders);
-                    const ordersBlob = new Blob([ordersCSV], { type: 'text/csv;charset=utf-8;' });
-                    const ordersURL = URL.createObjectURL(ordersBlob);
-                    const ordersLink = document.createElement('a');
-                    ordersLink.href = ordersURL;
-                    ordersLink.setAttribute('download', 'orders_payments_processed.csv');
-                    ordersLink.style.visibility = 'hidden';
-                    document.body.appendChild(ordersLink);
-                    ordersLink.click();
-                    document.body.removeChild(ordersLink);
+                    const combinedCSV = summaryCSV + "\n\n" + ordersCSV;
+
+                    // Export combined file
+                    const combinedBlob = new Blob([combinedCSV], { type: 'text/csv;charset=utf-8;' });
+                    const combinedURL = URL.createObjectURL(combinedBlob);
+                    const combinedLink = document.createElement('a');
+                    combinedLink.href = combinedURL;
+                    combinedLink.setAttribute('download', 'combined_orders_summary.csv');
+                    combinedLink.style.visibility = 'hidden';
+                    document.body.appendChild(combinedLink);
+                    combinedLink.click();
+                    document.body.removeChild(combinedLink);
 
                     // Export all cash transactions with all their data
                     if (state.results.cashTransactions && state.results.cashTransactions.length > 0) {
@@ -419,4 +411,5 @@
     </script>
 </body>
 </html>
+
 
