@@ -225,7 +225,7 @@
                     ordersLink.click();
                     document.body.removeChild(ordersLink);
 
-                    // Export cash transactions if any
+                    // Export all cash transactions with all their data
                     if (state.results.cashTransactions && state.results.cashTransactions.length > 0) {
                         const cashCSV = Papa.unparse(state.results.cashTransactions);
                         const cashBlob = new Blob([cashCSV], { type: 'text/csv;charset=utf-8;' });
@@ -322,7 +322,7 @@
                                     </tr>
                                 </thead>
                                 <tbody class="bg-white divide-y divide-gray-200">
-                                    ${state.results.processedOrders.slice(0, 10).map(order => `
+                                    ${state.results.processedOrders.map(order => `
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-4 py-3 text-sm text-gray-900">${order['Order ID'] || ''}</td>
                                             <td class="px-4 py-3 text-sm">
@@ -339,7 +339,6 @@
                                     `).join('')}
                                 </tbody>
                             </table>
-                            ${state.results.processedOrders.length > 10 ? `<p class="text-center text-gray-500 mt-4">... and ${state.results.processedOrders.length - 10} more rows</p>` : ''}
                         </div>
                     </div>
                 </div>
@@ -420,5 +419,4 @@
     </script>
 </body>
 </html>
-
 
