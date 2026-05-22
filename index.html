@@ -113,8 +113,15 @@
                                 row['Status'] ?? row['status'] ??
                                 row['Type'] ?? row['type'] ?? ''
                             ).toString().toLowerCase().trim();
-                            const isCancelled = ['cancel', 'refund', 'fail', 'void', 'chargeback']
+                            const statusCancelled = ['cancel', 'refund', 'fail', 'void', 'chargeback']
                                 .some(s => statusRaw.includes(s));
+
+                            // Check for non-empty "Decline reason" column
+                            const declineReason = (
+                                row['Decline reason'] ?? row['decline_reason'] ??
+                                row['Decline Reason'] ?? row['DeclineReason'] ?? ''
+                            ).toString().trim();
+                            const isCancelled = statusCancelled || declineReason.length > 0;
 
                             if (paymentRef) {
                                 if (isCancelled) {
