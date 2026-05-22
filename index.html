@@ -102,20 +102,43 @@
                 setTimeout(() => {
                     try {
                         const paymentFees = {};
+                        const cancelledOrderIds = new Set();
+
                         state.paymentsData.forEach(row => {
                             const paymentRef = row['payment_ref_id (metadata)']?.toString()?.trim();
                             const fee = parseFloat(row['Fee']?.toString()?.replace(',', '.'));
-                            if (paymentRef && !isNaN(fee)) {
-                                paymentFees[paymentRef] = fee;
+
+                            // Check any Status/Type column for cancellation indicators
+                            const statusRaw = (
+                                row['Status'] ?? row['status'] ??
+                                row['Type'] ?? row['type'] ?? ''
+                            ).toString().toLowerCase().trim();
+                            const isCancelled = ['cancel', 'refund', 'fail', 'void', 'chargeback']
+                                .some(s => statusRaw.includes(s));
+
+                            if (paymentRef) {
+                                if (isCancelled) {
+                                    cancelledOrderIds.add(paymentRef);
+                                } else if (!isNaN(fee)) {
+                                    paymentFees[paymentRef] = fee;
+                                }
                             }
                         });
 
                         let totalProcessingFee = 0;
                         let totalCashPayments = 0;
                         let cashOrderCount = 0;
-                        
+                        let cancelledOrderCount = 0;
+
                         const processedOrders = state.ordersData.map(order => {
                             const orderID = order['Order ID']?.toString()?.trim();
+
+                            // Cancelled payment — exclude from all totals
+                            if (cancelledOrderIds.has(orderID)) {
+                                cancelledOrderCount++;
+                                return { ...order, processingFee: 0, paymentType: 'Cancelled' };
+                            }
+
                             const fee = paymentFees[orderID] || 0;
                             totalProcessingFee += fee;
 
@@ -153,7 +176,10 @@
 
                         let grandTotalSum = 0;
                         if(grandTotalColumn && headers.includes(grandTotalColumn)) {
-                             grandTotalSum = state.ordersData.reduce((sum, row) => {
+                            // Exclude cancelled orders from Grand Total
+                            grandTotalSum = state.ordersData.reduce((sum, row) => {
+                                const orderID = row['Order ID']?.toString()?.trim();
+                                if (cancelledOrderIds.has(orderID)) return sum;
                                 let val = row[grandTotalColumn];
                                 if (typeof val === 'string') {
                                     val = val.replace(/[€$£,\s]/g, '').replace(',', '.');
@@ -170,7 +196,10 @@
                         // Filter for specific transaction types for export
                         const cashTransactions = processedOrders.filter(order => order.paymentType === 'Cash');
                         const chefTransactions = processedOrders.filter(order => order['Sales channel name']?.toString().toLowerCase().trim() === 'chef');
+                        const cancelledTransactions = processedOrders.filter(order => order.paymentType === 'Cancelled');
 
+
+                        const activeOrderCount = state.ordersData.length - cancelledOrderCount;
 
                         setState({
                             results: {
@@ -178,13 +207,15 @@
                                 totalProcessingFee,
                                 totalCashPayments,
                                 cashOrderCount,
+                                cancelledOrderCount,
                                 grandTotalSum,
                                 commission,
                                 totalPreVat,
                                 cashTransactions,
                                 chefTransactions,
+                                cancelledTransactions,
                                 summary: [
-                                    { label: `Grand Total SUM (${state.ordersData.length} rows)`, value: grandTotalSum },
+                                    { label: `Grand Total SUM (${activeOrderCount} active rows, ${cancelledOrderCount} cancelled excluded)`, value: grandTotalSum },
                                     { label: 'Total Pre-VAT (Total / 1.09)', value: totalPreVat },
                                     { label: `Commission (${(state.commissionRate * 100).toFixed(2)}%)`, value: commission },
                                     { label: 'Total Processing Fee', value: totalProcessingFee },
@@ -246,6 +277,20 @@
                         document.body.appendChild(chefLink);
                         chefLink.click();
                         document.body.removeChild(chefLink);
+                    }
+
+                    // Export cancelled transactions if any
+                    if (state.results.cancelledTransactions && state.results.cancelledTransactions.length > 0) {
+                        const cancelledCSV = Papa.unparse(state.results.cancelledTransactions);
+                        const cancelledBlob = new Blob([cancelledCSV], { type: 'text/csv;charset=utf-8;' });
+                        const cancelledURL = URL.createObjectURL(cancelledBlob);
+                        const cancelledLink = document.createElement('a');
+                        cancelledLink.href = cancelledURL;
+                        cancelledLink.setAttribute('download', 'cancelled_transactions.csv');
+                        cancelledLink.style.visibility = 'hidden';
+                        document.body.appendChild(cancelledLink);
+                        cancelledLink.click();
+                        document.body.removeChild(cancelledLink);
                     }
 
 
@@ -321,7 +366,11 @@
                                         <tr class="hover:bg-gray-50">
                                             <td class="px-4 py-3 text-sm text-gray-900">${order['Order ID'] || ''}</td>
                                             <td class="px-4 py-3 text-sm">
-                                                <span class="px-2 py-1 rounded-full text-xs font-medium ${order.paymentType === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">
+                                                <span class="px-2 py-1 rounded-full text-xs font-medium ${
+                                                    order.paymentType === 'Cash' ? 'bg-green-100 text-green-800' :
+                                                    order.paymentType === 'Cancelled' ? 'bg-red-100 text-red-800' :
+                                                    'bg-blue-100 text-blue-800'
+                                                }">
                                                     ${order.paymentType}
                                                 </span>
                                             </td>
