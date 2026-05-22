@@ -102,33 +102,33 @@
                 setTimeout(() => {
                     try {
                         const paymentFees = {};
-                        const cancelledOrderIds = new Set();
 
                         state.paymentsData.forEach(row => {
                             const paymentRef = row['payment_ref_id (metadata)']?.toString()?.trim();
                             const fee = parseFloat(row['Fee']?.toString()?.replace(',', '.'));
 
-                            // Check any Status/Type column for cancellation indicators
+                            // Skip failed/declined rows — do NOT let them block the order ID.
+                            // Only rows with a clean Status and no Decline Reason are valid.
                             const statusRaw = (
                                 row['Status'] ?? row['status'] ??
                                 row['Type'] ?? row['type'] ?? ''
                             ).toString().toLowerCase().trim();
-                            const statusCancelled = ['cancel', 'refund', 'fail', 'void', 'chargeback']
+                            const statusBad = ['cancel', 'refund', 'fail', 'void', 'chargeback']
                                 .some(s => statusRaw.includes(s));
 
-                            // Check for non-empty "Decline reason" column
                             const declineReason = (
                                 row['Decline reason'] ?? row['decline_reason'] ??
                                 row['Decline Reason'] ?? row['DeclineReason'] ?? ''
                             ).toString().trim();
-                            const isCancelled = statusCancelled || declineReason.length > 0;
 
-                            if (paymentRef) {
-                                if (isCancelled) {
-                                    cancelledOrderIds.add(paymentRef);
-                                } else if (!isNaN(fee)) {
-                                    paymentFees[paymentRef] = fee;
-                                }
+                            const isValidPayment = !statusBad && declineReason.length === 0;
+
+                            // Only store valid payments. If an order had a failed attempt
+                            // AND a successful one, the successful row wins (written last,
+                            // or use Math.max to keep whichever is larger).
+                            if (paymentRef && isValidPayment && !isNaN(fee)) {
+                                // Keep the highest fee if multiple valid rows exist
+                                paymentFees[paymentRef] = Math.max(paymentFees[paymentRef] || 0, fee);
                             }
                         });
 
@@ -140,8 +140,15 @@
                         const processedOrders = state.ordersData.map(order => {
                             const orderID = order['Order ID']?.toString()?.trim();
 
-                            // Cancelled payment — exclude from all totals
-                            if (cancelledOrderIds.has(orderID)) {
+                            // Exclude orders that are cancelled in the ORDERS file itself
+                            const orderStatus = (
+                                order['Order Status'] ?? order['order_status'] ??
+                                order['Status'] ?? ''
+                            ).toString().toLowerCase().trim();
+                            const isOrderCancelled = ['cancel', 'refund', 'void']
+                                .some(s => orderStatus.includes(s));
+
+                            if (isOrderCancelled) {
                                 cancelledOrderCount++;
                                 return { ...order, processingFee: 0, paymentType: 'Cancelled' };
                             }
@@ -183,10 +190,16 @@
 
                         let grandTotalSum = 0;
                         if(grandTotalColumn && headers.includes(grandTotalColumn)) {
-                            // Exclude cancelled orders from Grand Total
                             grandTotalSum = state.ordersData.reduce((sum, row) => {
-                                const orderID = row['Order ID']?.toString()?.trim();
-                                if (cancelledOrderIds.has(orderID)) return sum;
+                                // Exclude cancelled orders from Grand Total
+                                const orderStatus = (
+                                    row['Order Status'] ?? row['order_status'] ??
+                                    row['Status'] ?? ''
+                                ).toString().toLowerCase().trim();
+                                const isOrderCancelled = ['cancel', 'refund', 'void']
+                                    .some(s => orderStatus.includes(s));
+                                if (isOrderCancelled) return sum;
+
                                 let val = row[grandTotalColumn];
                                 if (typeof val === 'string') {
                                     val = val.replace(/[€$£,\s]/g, '').replace(',', '.');

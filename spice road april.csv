@@ -1,0 +1,27 @@
+Merchant,"Order ID",Date,Time,"Transaction Type","Order Status","Payment Method",Coupons,"Discounted Value","Delivery Fee","Delivery By","Delivery Tax","Product Tax",Tip,"Sub Total","Cost Price","Grand Total",Commission,"Currency Code","Tax Method","Delivery Provider"
+"Spice Road",9051,2026-04-01,16:32,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,17,0,20,2.38,EUR,inclusive,NA
+"Spice Road",9061,2026-04-02,14:25,Delivery,Completed,"Ideal & Credit Card",[],0,2,Merchant,0,0,0,23,0,25,3.22,EUR,inclusive,NA
+"Spice Road",9062,2026-04-02,16:55,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,36.5,0,39.5,5.11,EUR,inclusive,NA
+"Spice Road",9064,2026-04-02,18:50,Delivery,Completed,"Ideal & Credit Card",[],0,2,Merchant,0,0,0,18,0,20,2.52,EUR,inclusive,NA
+"Spice Road",9066,2026-04-03,15:24,Delivery,Completed,"Ideal & Credit Card",[],0,2,Merchant,0,0,0,18.5,0,20.5,2.59,EUR,inclusive,NA
+"Spice Road",9079,2026-04-07,12:10,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,18.5,0,21.5,2.59,EUR,inclusive,NA
+"Spice Road",9081,2026-04-07,13:31,Pickup,Completed,"Ideal & Credit Card",[],0,0,Merchant,0,0,0,18.5,0,18.5,2.59,EUR,inclusive,NA
+"Spice Road",9087,2026-04-08,13:45,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,3.7,37,0,43.7,5.18,EUR,inclusive,NA
+"Spice Road",9092,2026-04-08,17:59,Delivery,Completed,Contant,[],0,0,Merchant,0,0,0,20,0,20,2.8,EUR,inclusive,NA
+"Spice Road",9101,2026-04-09,17:09,Pickup,Completed,Cash,[],0,0,Merchant,0,0,0,38.5,0,38.5,5.39,EUR,inclusive,NA
+"Spice Road",9104,2026-04-09,17:44,Pickup,Completed,Cash,"[{""coupon_code"":""NIDHA10"",""discount_value_type"":""fixed"",""created_by"":""tenant"",""calculated_discount_amount"":10,""discount_category_type"":""order""}]",10,0,Merchant,0,0,0,17,0,7,2.38,EUR,inclusive,NA
+"Spice Road",9133,2026-04-13,19:09,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,18.5,0,21.5,2.59,EUR,inclusive,NA
+"Spice Road",9137,2026-04-15,16:28,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,2.05,20.5,0,25.55,2.87,EUR,inclusive,NA
+"Spice Road",9138,2026-04-15,18:55,Delivery,Completed,"Ideal & Credit Card",[],0,0,Merchant,0,0,0,25.5,0,25.5,3.57,EUR,inclusive,NA
+"Spice Road",9140,2026-04-15,19:41,Delivery,Completed,Cash,[],0,2,Merchant,0,0,0,18,0,20,2.52,EUR,inclusive,NA
+"Spice Road",9141,2026-04-15,19:55,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,37,0,40,5.18,EUR,inclusive,NA
+"Spice Road",9145,2026-04-16,18:22,Delivery,Completed,Cash,[],0,3,Merchant,0,0,0,37.5,0,40.5,5.25,EUR,inclusive,NA
+"Spice Road",9146,2026-04-16,18:25,Delivery,Completed,"Ideal & Credit Card","[{""coupon_code"":""WELCOME7"",""discount_value_type"":""percentage"",""created_by"":""tenant"",""calculated_discount_amount"":1.75,""discount_category_type"":""order""}]",1.75,3,Merchant,0,0,0,17.5,0,18.75,2.45,EUR,inclusive,NA
+"Spice Road",9147,2026-04-17,16:16,Delivery,Completed,"Ideal & Credit Card",[],0,2,Merchant,0,0,0,19,0,21,2.66,EUR,inclusive,NA
+"Spice Road",9158,2026-04-18,18:35,Delivery,Completed,"Ideal & Credit Card",[],0,2,Merchant,0,0,0,17.5,0,19.5,2.45,EUR,inclusive,NA
+"Spice Road",9160,2026-04-18,19:54,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,24,0,27,3.36,EUR,inclusive,NA
+"Spice Road",9161,2026-04-19,12:22,Delivery,Completed,"Ideal & Credit Card","[{""coupon_code"":""WELCOME7"",""discount_value_type"":""percentage"",""created_by"":""tenant"",""calculated_discount_amount"":1.83,""discount_category_type"":""order""}]",1.83,2,Merchant,0,0,0,18.25,0,18.42,2.56,EUR,inclusive,NA
+"Spice Road",9162,2026-04-19,12:47,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,19,0,22,2.66,EUR,inclusive,NA
+"Spice Road",9168,2026-04-20,13:34,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,18.5,0,21.5,2.59,EUR,inclusive,NA
+"Spice Road",9171,2026-04-20,17:17,Delivery,Completed,"Ideal & Credit Card",[],0,2,Merchant,0,0,1.5,19,0,22.5,2.66,EUR,inclusive,NA
+"Spice Road",9172,2026-04-20,17:49,Delivery,Completed,"Ideal & Credit Card",[],0,3,Merchant,0,0,0,24.5,0,27.5,3.43,EUR,inclusive,NA
